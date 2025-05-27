@@ -103,6 +103,15 @@ renderPendulumWithTrace cfg st trace =
     , renderPendulum cfg st
     ]
 
+-- Default config and state generator
+defaultConfigAndState :: IO (PendulumConfig, PendulumState)
+defaultConfigAndState = do
+  θ1 <- randomRIO (-pi/2, pi/2)
+  θ2 <- randomRIO (-pi, pi)
+  let c = PendulumConfig 1.0 1.0 1.0 1.0 9.8 500
+      s = PendulumState θ1 θ2 0 0
+  return (c, s)
+
 
 -- Load config and state from file, fallback to defaults/random
 loadConfigAndState :: FilePath -> IO (PendulumConfig, PendulumState)
@@ -112,12 +121,7 @@ loadConfigAndState path = do
       st  = decode content :: Maybe PendulumState
   case (cfg, st) of
     (Just c, Just s) -> return (c, s)
-    _ -> do
-      θ1 <- randomRIO (-pi/2, pi/2)
-      θ2 <- randomRIO (-pi, pi)
-      let c = PendulumConfig 1.0 1.0 1.0 1.0 9.8 500
-          s = PendulumState θ1 θ2 0 0
-      return (c, s)
+    _ -> defaultConfigAndState
 
 -- Animation
 main :: IO ()
@@ -126,12 +130,7 @@ main = do
   (cfg, initialState) <-
     case args of
       (configPath:_) -> loadConfigAndState configPath
-      _ -> do
-        θ1 <- randomRIO (-pi/2, pi/2)
-        θ2 <- randomRIO (-pi, pi)
-        let cfg = PendulumConfig 1.0 1.0 1.0 1.0 9.8 500
-            initialState = PendulumState θ1 θ2 0 0
-        return (cfg, initialState)
+      _ -> defaultConfigAndState
   let window = InWindow "Double Pendulum" (800, 600) (10, 10)
 
   -- Create a mutable reference to hold the state
