@@ -72,7 +72,8 @@ executable DoublePendulum
                        gloss,
                        random,
                        aeson,
-                       bytestring
+                       bytestring,
+                       containers
 
     -- Directories containing source files.
     hs-source-dirs:   app

@@ -16,12 +16,19 @@ import qualified Data.ByteString.Lazy as B
 import Data.Maybe (fromMaybe)
 import System.Environment (getArgs)
 
+-- for trace
+import qualified Data.Sequence as Seq
+import Data.Foldable (toList)
+
+-- Add this type to hold the trace
+type Trace = Seq.Seq (Float, Float)
 
 -- Configuration
 data PendulumConfig = PendulumConfig
   { m1 :: Double, m2 :: Double
   , l1 :: Double, l2 :: Double
-  , g  :: Double }
+  , g  :: Double
+  , maxTraceLength :: Int }
 
 instance FromJSON PendulumConfig where
   parseJSON = withObject "PendulumConfig" $ \v -> do
@@ -30,6 +37,7 @@ instance FromJSON PendulumConfig where
     l1 <- v .:? "length_1"  .!= 1.0
     l2 <- v .:? "length_2"  .!= 1.0
     g  <- v .:? "g"         .!= 9.8
+    maxTraceLength <- v .:? "max_trace_length" .!= 500
     return PendulumConfig{..}
 
 -- State
@@ -88,6 +96,14 @@ renderPendulum PendulumConfig{..} PendulumState{..} =
           printf "θ₁=%.2f θ₂=%.2f" (realToFrac theta1 :: Float) (realToFrac theta2 :: Float)
       ]
 
+renderPendulumWithTrace :: PendulumConfig -> PendulumState -> [(Float, Float)] -> Picture
+renderPendulumWithTrace cfg st trace =
+  pictures
+    [ color (makeColorI 0 255 0 128) $ line trace
+    , renderPendulum cfg st
+    ]
+
+
 -- Load config and state from file, fallback to defaults/random
 loadConfigAndState :: FilePath -> IO (PendulumConfig, PendulumState)
 loadConfigAndState path = do
@@ -99,7 +115,7 @@ loadConfigAndState path = do
     _ -> do
       θ1 <- randomRIO (-pi/2, pi/2)
       θ2 <- randomRIO (-pi, pi)
-      let c = PendulumConfig 1.0 1.0 1.0 1.0 9.8
+      let c = PendulumConfig 1.0 1.0 1.0 1.0 9.8 500
           s = PendulumState θ1 θ2 0 0
       return (c, s)
 
@@ -113,22 +129,34 @@ main = do
       _ -> do
         θ1 <- randomRIO (-pi/2, pi/2)
         θ2 <- randomRIO (-pi, pi)
-        let cfg = PendulumConfig 1.0 1.0 1.0 1.0 9.8
+        let cfg = PendulumConfig 1.0 1.0 1.0 1.0 9.8 500
             initialState = PendulumState θ1 θ2 0 0
         return (cfg, initialState)
   let window = InWindow "Double Pendulum" (800, 600) (10, 10)
 
   -- Create a mutable reference to hold the state
   stateRef <- newIORef initialState
+  traceRef <- newIORef Seq.empty
 
   -- Use animateIO instead of animate to maintain state between frames
-  animateIO window white (frameFunc cfg stateRef) (const (return ()))
+  animateIO window white (frameFunc cfg stateRef traceRef) (const (return ()))
 
-frameFunc :: PendulumConfig -> IORef PendulumState -> Float -> IO Picture
-frameFunc cfg stateRef _time = do
+-- Update frameFunc to update and render the trace
+frameFunc :: PendulumConfig -> IORef PendulumState -> IORef Trace -> Float -> IO Picture
+frameFunc cfg stateRef traceRef _time = do
   currentState <- readIORef stateRef
   let dt = 0.016  -- time step (~60 FPS)
       newState = eulerStep cfg (realToFrac dt) currentState
+      -- Calculate head position
+      x2 = realToFrac (l1 cfg * sin (theta1 newState) + l2 cfg * sin (theta2 newState)) :: Float
+      y2 = realToFrac (-l1 cfg * cos (theta1 newState) - l2 cfg * cos (theta2 newState)) :: Float
+      scaleFactor = 100
+      headPos = (x2 * scaleFactor, y2 * scaleFactor)
+  -- Update trace
+  modifyIORef' traceRef $ \trace ->
+    let trace' = trace Seq.|> headPos
+    in if Seq.length trace' > maxTraceLength cfg then Seq.drop 1 trace' else trace'
   writeIORef stateRef newState
-  return $ renderPendulum cfg newState
+  trace <- readIORef traceRef
+  return $ renderPendulumWithTrace cfg newState (toList trace)
 

@@ -7,5 +7,6 @@
   "length_2": 1,
   "theta_2": 90,
   "omega_2": 0,
-  "g": 9.81
+  "g": 9.81,
+  "max_trace_length": 100
 }

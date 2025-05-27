@@ -22,7 +22,8 @@ The simulation can be condigured with the JSON config file:
   "length_2": 1,
   "theta_2": 90,
   "omega_2": 0,
-  "g": 9.81
+  "g": 9.81,
+  "max_trace_length": 100
 }
 ```
 Where
@@ -30,6 +31,7 @@ Where
 - length - length of each arm
 - theta - initial angle of each arm from the vertial in degrees, so -90 would be full left swing
 - omega - initial angular velocity of each arm
+- max_trace_length - length of the trace of the pendulum head in simulation steps
 
 Then the simulation can be run with:
 ```bash
