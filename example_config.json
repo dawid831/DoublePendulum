@@ -1,0 +1,11 @@
+{
+  "mass_1": 1,
+  "length_1": 1,
+  "theta_1": 45,
+  "omega_1": 0,
+  "mass_2": 1,
+  "length_2": 1,
+  "theta_2": 90,
+  "omega_2": 0,
+  "g": 9.81
+}

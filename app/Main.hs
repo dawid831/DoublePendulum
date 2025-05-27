@@ -1,4 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Main where
 
@@ -9,16 +10,43 @@ import Text.Printf (printf)
 import Data.IORef
 import Control.Monad (when)
 
+-- for json loading
+import Data.Aeson
+import qualified Data.ByteString.Lazy as B
+import Data.Maybe (fromMaybe)
+import System.Environment (getArgs)
+
+
 -- Configuration
 data PendulumConfig = PendulumConfig
   { m1 :: Double, m2 :: Double
   , l1 :: Double, l2 :: Double
   , g  :: Double }
 
+instance FromJSON PendulumConfig where
+  parseJSON = withObject "PendulumConfig" $ \v -> do
+    m1 <- v .:? "mass_1"    .!= 1.0
+    m2 <- v .:? "mass_2"    .!= 1.0
+    l1 <- v .:? "length_1"  .!= 1.0
+    l2 <- v .:? "length_2"  .!= 1.0
+    g  <- v .:? "g"         .!= 9.8
+    return PendulumConfig{..}
+
 -- State
 data PendulumState = PendulumState
   { theta1 :: Double, theta2 :: Double
   , omega1 :: Double, omega2 :: Double }
+
+instance FromJSON PendulumState where
+  parseJSON = withObject "PendulumState" $ \v -> do
+    theta1Deg <- v .:? "theta_1" .!= 0
+    theta2Deg <- v .:? "theta_2" .!= 0
+    omega1 <- v .:? "omega_1" .!= 0
+    omega2 <- v .:? "omega_2" .!= 0
+    let degToRad x = x * pi / 180
+        theta1 = degToRad theta1Deg
+        theta2 = degToRad theta2Deg
+    return PendulumState{..}
 
 -- Simple Euler integration
 eulerStep :: PendulumConfig -> Double -> PendulumState -> PendulumState
@@ -60,19 +88,39 @@ renderPendulum PendulumConfig{..} PendulumState{..} =
           printf "θ₁=%.2f θ₂=%.2f" (realToFrac theta1 :: Float) (realToFrac theta2 :: Float)
       ]
 
+-- Load config and state from file, fallback to defaults/random
+loadConfigAndState :: FilePath -> IO (PendulumConfig, PendulumState)
+loadConfigAndState path = do
+  content <- B.readFile path
+  let cfg = decode content :: Maybe PendulumConfig
+      st  = decode content :: Maybe PendulumState
+  case (cfg, st) of
+    (Just c, Just s) -> return (c, s)
+    _ -> do
+      θ1 <- randomRIO (-pi/2, pi/2)
+      θ2 <- randomRIO (-pi, pi)
+      let c = PendulumConfig 1.0 1.0 1.0 1.0 9.8
+          s = PendulumState θ1 θ2 0 0
+      return (c, s)
+
 -- Animation
 main :: IO ()
 main = do
-  -- Random initial conditions
-  θ1 <- randomRIO (-pi/2, pi/2)
-  θ2 <- randomRIO (-pi, pi)
-  let cfg = PendulumConfig 1.0 1.0 1.0 1.0 9.8
-      initialState = PendulumState θ1 θ2 0 0
-      window = InWindow "Double Pendulum" (800, 600) (10, 10)
-  
+  args <- getArgs
+  (cfg, initialState) <-
+    case args of
+      (configPath:_) -> loadConfigAndState configPath
+      _ -> do
+        θ1 <- randomRIO (-pi/2, pi/2)
+        θ2 <- randomRIO (-pi, pi)
+        let cfg = PendulumConfig 1.0 1.0 1.0 1.0 9.8
+            initialState = PendulumState θ1 θ2 0 0
+        return (cfg, initialState)
+  let window = InWindow "Double Pendulum" (800, 600) (10, 10)
+
   -- Create a mutable reference to hold the state
   stateRef <- newIORef initialState
-  
+
   -- Use animateIO instead of animate to maintain state between frames
   animateIO window white (frameFunc cfg stateRef) (const (return ()))
 
