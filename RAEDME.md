@@ -23,7 +23,9 @@ The simulation can be condigured with the JSON config file:
   "theta_2": 90,
   "omega_2": 0,
   "g": 9.81,
-  "max_trace_length": 100
+  "max_trace_length": 100,
+  "color_head": [255, 0, 255],
+  "color_trace": [0, 255, 255]
 }
 ```
 Where
@@ -32,6 +34,8 @@ Where
 - theta - initial angle of each arm from the vertial in degrees, so -90 would be full left swing
 - omega - initial angular velocity of each arm
 - max_trace_length - length of the trace of the pendulum head in simulation steps
+- color_head - color of the pendulum head, as RGB values
+- color_trace - color of the pendulum trace, as RGB values
 
 Then the simulation can be run with:
 ```bash

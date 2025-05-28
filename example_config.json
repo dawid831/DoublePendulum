@@ -8,5 +8,7 @@
   "theta_2": 90,
   "omega_2": 0,
   "g": 9.81,
-  "max_trace_length": 100
+  "max_trace_length": 100,
+  "color_head": [255, 0, 255],
+  "color_trace": [0, 255, 255]
 }

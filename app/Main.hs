@@ -15,6 +15,7 @@ import Data.Aeson
 import qualified Data.ByteString.Lazy as B
 import Data.Maybe (fromMaybe)
 import System.Environment (getArgs)
+import Data.Aeson.Types (Parser)
 
 -- for trace
 import qualified Data.Sequence as Seq
@@ -28,7 +29,23 @@ data PendulumConfig = PendulumConfig
   { m1 :: Double, m2 :: Double
   , l1 :: Double, l2 :: Double
   , g  :: Double
-  , maxTraceLength :: Int }
+  , maxTraceLength :: Int
+  , colorHead :: Color
+  , colorTrace :: Color
+  }
+
+-- Helper to parse [r,g,b] arrays and convert to Color
+parseColor :: Maybe Value -> Color -> Parser Color
+parseColor (Just v) _ = withArray "RGB" (\arr ->
+  if length arr == 3
+    then do
+      let [r, g, b] = toList arr
+      r' <- parseJSON r
+      g' <- parseJSON g
+      b' <- parseJSON b
+      return $ makeColorI r' g' b' 255
+    else fail "RGB array must have exactly 3 elements") v
+parseColor Nothing def = pure def
 
 instance FromJSON PendulumConfig where
   parseJSON = withObject "PendulumConfig" $ \v -> do
@@ -38,6 +55,10 @@ instance FromJSON PendulumConfig where
     l2 <- v .:? "length_2"  .!= 1.0
     g  <- v .:? "g"         .!= 9.8
     maxTraceLength <- v .:? "max_trace_length" .!= 500
+    rawColorHead <- (v .:? "color_head")
+    rawColorTrace <- (v .:? "color_trace")
+    colorHead <- parseColor rawColorHead (makeColorI 255 0 0 255)
+    colorTrace <- parseColor rawColorTrace (makeColorI 0 255 0 128)
     return PendulumConfig{..}
 
 -- State
@@ -89,9 +110,9 @@ renderPendulum PendulumConfig{..} PendulumState{..} =
       bobRadius = 10
   in pictures
       [ color blue $ line [(0, 0), (x1*scaleFactor, y1*scaleFactor)]
-      , color red $ translate (x1*scaleFactor) (y1*scaleFactor) $ circleSolid bobRadius
+      , color colorHead $ translate (x1*scaleFactor) (y1*scaleFactor) $ circleSolid bobRadius
       , color blue $ translate (x1*scaleFactor) (y1*scaleFactor) $ line [(0, 0), ((x2-x1)*scaleFactor, (y2-y1)*scaleFactor)]
-      , color red $ translate (x2*scaleFactor) (y2*scaleFactor) $ circleSolid bobRadius
+      , color colorHead $ translate (x2*scaleFactor) (y2*scaleFactor) $ circleSolid bobRadius
       , color white $ translate (-300) (-250) $ scale 0.1 0.1 $ text $ 
           printf "θ₁=%.2f θ₂=%.2f" (realToFrac theta1 :: Float) (realToFrac theta2 :: Float)
       ]
@@ -99,7 +120,7 @@ renderPendulum PendulumConfig{..} PendulumState{..} =
 renderPendulumWithTrace :: PendulumConfig -> PendulumState -> [(Float, Float)] -> Picture
 renderPendulumWithTrace cfg st trace =
   pictures
-    [ color (makeColorI 0 255 0 128) $ line trace
+    [ color (colorTrace cfg) $ line trace
     , renderPendulum cfg st
     ]
 
@@ -108,7 +129,7 @@ defaultConfigAndState :: IO (PendulumConfig, PendulumState)
 defaultConfigAndState = do
   θ1 <- randomRIO (-pi/2, pi/2)
   θ2 <- randomRIO (-pi, pi)
-  let c = PendulumConfig 1.0 1.0 1.0 1.0 9.8 500
+  let c = PendulumConfig 1.0 1.0 1.0 1.0 9.8 500 (makeColorI 255 0 0 255) (makeColorI 0 255 0 128)
       s = PendulumState θ1 θ2 0 0
   return (c, s)
 
