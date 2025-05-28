@@ -1,0 +1,14 @@
+{
+  "mass_1": 1,
+  "length_1": 1,
+  "theta_1": 45,
+  "omega_1": 0,
+  "mass_2": 1,
+  "length_2": 1,
+  "theta_2": 90,
+  "omega_2": 0,
+  "g": 9.81,
+  "max_trace_length": 500,
+  "color_head": [192, 0, 192],
+  "color_trace": [255, 0, 255]
+}
