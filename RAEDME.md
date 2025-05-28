@@ -37,7 +37,7 @@ Where
 - color_head - color of the pendulum head, as RGB values
 - color_trace - color of the pendulum trace, as RGB values
 
-Then the simulation can be run with:
+Then the simulation can be run with, where `example_config.json` describes one pendulum and `another_config.json` describes another pendulum and :
 ```bash
-cabal run DoublePendulum example_config.json
+cabal run DoublePendulum example_config.json <another_config.json>
 ```

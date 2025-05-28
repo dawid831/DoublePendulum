@@ -148,35 +148,61 @@ loadConfigAndState path = do
 main :: IO ()
 main = do
   args <- getArgs
-  (cfg, initialState) <-
+  -- Load first pendulum config/state
+  (cfg1, st1) <-
     case args of
-      (configPath:_) -> loadConfigAndState configPath
+      (configPath1:configPath2:_) -> loadConfigAndState configPath1
+      (configPath1:_) -> loadConfigAndState configPath1
+      _ -> defaultConfigAndState
+  -- Load second pendulum config/state
+  (cfg2, st2) <-
+    case args of
+      (_:configPath2:_) -> loadConfigAndState configPath2
       _ -> defaultConfigAndState
   let window = InWindow "Double Pendulum" (800, 600) (10, 10)
 
   -- Create a mutable reference to hold the state
-  stateRef <- newIORef initialState
-  traceRef <- newIORef Seq.empty
-
+  traceRef1 <- newIORef Seq.empty
+  traceRef2 <- newIORef Seq.empty
+  stateRef1 <- newIORef st1
+  stateRef2 <- newIORef st2
   -- Use animateIO instead of animate to maintain state between frames
-  animateIO window white (frameFunc cfg stateRef traceRef) (const (return ()))
+  animateIO window black (frameFunc2 cfg1 stateRef1 traceRef1 cfg2 stateRef2 traceRef2) (const (return ()))
 
--- Update frameFunc to update and render the trace
-frameFunc :: PendulumConfig -> IORef PendulumState -> IORef Trace -> Float -> IO Picture
-frameFunc cfg stateRef traceRef _time = do
-  currentState <- readIORef stateRef
-  let dt = 0.016  -- time step (~60 FPS)
-      newState = eulerStep cfg (realToFrac dt) currentState
-      -- Calculate head position
-      x2 = realToFrac (l1 cfg * sin (theta1 newState) + l2 cfg * sin (theta2 newState)) :: Float
-      y2 = realToFrac (-l1 cfg * cos (theta1 newState) - l2 cfg * cos (theta2 newState)) :: Float
-      scaleFactor = 100
+
+-- Helper to update pendulum state and trace
+updatePendulum
+  :: PendulumConfig
+  -> IORef PendulumState
+  -> IORef Trace
+  -> Float -- scaleFactor
+  -> IO (PendulumState, [(Float, Float)])
+updatePendulum cfg stateRef traceRef scaleFactor = do
+  st <- readIORef stateRef
+  let dt = 0.016
+      newSt = eulerStep cfg dt st
+      x2 = realToFrac (l1 cfg * sin (theta1 newSt) + l2 cfg * sin (theta2 newSt)) :: Float
+      y2 = realToFrac (-l1 cfg * cos (theta1 newSt) - l2 cfg * cos (theta2 newSt)) :: Float
       headPos = (x2 * scaleFactor, y2 * scaleFactor)
-  -- Update trace
   modifyIORef' traceRef $ \trace ->
     let trace' = trace Seq.|> headPos
     in if Seq.length trace' > maxTraceLength cfg then Seq.drop 1 trace' else trace'
-  writeIORef stateRef newState
-  trace <- readIORef traceRef
-  return $ renderPendulumWithTrace cfg newState (toList trace)
+  writeIORef stateRef newSt
+  traceList <- fmap toList (readIORef traceRef)
+  return (newSt, traceList)
+
+-- Frame function for two pendulums
+frameFunc2
+  :: PendulumConfig -> IORef PendulumState -> IORef Trace
+  -> PendulumConfig -> IORef PendulumState -> IORef Trace
+  -> Float -> IO Picture
+frameFunc2 cfg1 stateRef1 traceRef1 cfg2 stateRef2 traceRef2 _time = do
+  let scaleFactor = 100
+  (newSt1, trace1) <- updatePendulum cfg1 stateRef1 traceRef1 scaleFactor
+  (newSt2, trace2) <- updatePendulum cfg2 stateRef2 traceRef2 scaleFactor
+
+  -- Compose both pendulums
+  let pend1 = renderPendulumWithTrace cfg1 newSt1 trace1
+      pend2 = renderPendulumWithTrace cfg2 newSt2 trace2
+  return $ pictures [pend1, pend2]
 
